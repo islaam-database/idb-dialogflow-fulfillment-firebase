@@ -1,6 +1,6 @@
 import * as functions from "firebase-functions";
 import IslaamDBClient from "islaam-db-client";
-const { WebhookClient } = require("dialogflow-fulfillment");
+const { WebhookClient, Suggestion } = require("dialogflow-fulfillment");
 
 // Start writing Firebase Functions
 // https://firebase.google.com/docs/functions/typescript
@@ -17,9 +17,20 @@ export const dialogflowFulfillment = functions.https.onRequest((request, respons
     intentMap.set("who-is", async (agent: any) => {
         const personQuery = agent.parameters.person as string;
         const person = await idb.queryForPerson(personQuery);
-        agent.add(await person.getBio(idb));
+        const bioText = await person.getBio(idb);
+
+        // add responses
+        agent.add(bioText);
+
+        const randomIndex = Math.floor(Math.random() * bioText.praiserNames.length);
+        const randomTeacher = bioText.praiserNames[randomIndex];
+
+        agent.add(new Suggestion(`${person.name}'s teachers.`))
+        agent.add(new Suggestion(`Who praised ${person.name}?`))
+        if (randomTeacher)
+            agent.add(new Suggestion(`Who is ${randomTeacher}?`))
     });
-    // get teachers
+    // get teachers handler
     intentMap.set("get-teachers", async (agent) => {
         const query = agent.parameters.person as string;
         const person = await idb.queryForPerson(query);
@@ -28,9 +39,9 @@ export const dialogflowFulfillment = functions.https.onRequest((request, respons
         if (teachers.length)
             agent.add(`${person.name}'s teachers include: ${uniqueteachers.join(", ")}`);
         else
-            agent.add(`Sorry. There is no currently information on the teachers of ${person.name}.`);
+            agent.add(`Sorry. There is currently no information on the teachers of ${person.name}.`);
     });
-    // get students
+    // get students handler
     intentMap.set("get-students", async (agent) => {
         const query = agent.parameters.person as string;
         const person = await idb.queryForPerson(query);
@@ -41,7 +52,7 @@ export const dialogflowFulfillment = functions.https.onRequest((request, respons
         else
             agent.add(`Sorry. There is no currently information on the students of ${person.name}.`);
     });
-    // get praisers
+    // get praisers handler
     intentMap.set("get-praisers", async (agent) => {
         const query = agent.parameters.person as string;
         const person = await idb.queryForPerson(query);
@@ -52,7 +63,7 @@ export const dialogflowFulfillment = functions.https.onRequest((request, respons
         else
             agent.add(`Sorry. There is no currently information on who praised of ${person.name}.`);
     });
-    // get praisees
+    // get praisees handler
     intentMap.set("get-praisees", async (agent) => {
         const query = agent.parameters.person as string;
         const person = await idb.queryForPerson(query);
@@ -64,5 +75,9 @@ export const dialogflowFulfillment = functions.https.onRequest((request, respons
             agent.add(`Sorry. There is no currently information who ${person.name} praised.`);
     });
     return mainAgent.handleRequest(intentMap);
-});
 
+    async function getPerson(agent: any) {
+        const person = await idb.queryForPerson(agent.parameters.person);
+        return person;
+    }
+});
